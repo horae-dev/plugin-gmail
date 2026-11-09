@@ -1,0 +1,42 @@
+{
+  "backend": "anthropic",
+  "model": "claude-fixture-1",
+  "output": {
+    "intents": [
+      {
+        "due": "2026-11-20",
+        "fingerprint": "gmail:18f0b0000000a001",
+        "title": "Pay the Orange invoice",
+        "type": "task.create"
+      }
+    ],
+    "summary": "One task: an invoice to pay.",
+    "triaged": [
+      {
+        "confidence": "high",
+        "due": "2026-11-20",
+        "message_id": "18f0b0000000a001",
+        "outcome": "task",
+        "title": "Pay the Orange invoice"
+      }
+    ]
+  },
+  "request": {
+    "input_sha256": "4fcc68f9492bf5cb95c51afe734d47005b984932a64e75abd64b902a98aa5448",
+    "schema_sha256": "05bfa56076ae8d9623bd844464828a497e1a4c89f3b386a7ba8cd3b5282c9935",
+    "system_sha256": "442fb3c056bfbccb836703d92cacefe5b7124a488ba615fe59417095642e784f"
+  },
+  "schema_version": 1,
+  "skill": "gmail/triage-mail",
+  "skill_digest": "80af72e9d3317c0c51fd62d55fdd52b01885862e3492ee8bae832f88b3f52ce6",
+  "skill_version": "0.1.0",
+  "stop_reason": "end_turn",
+  "usage": {
+    "cache_read_tokens": null,
+    "cache_write_tokens": null,
+    "priced": false,
+    "tokens_in": 600,
+    "tokens_out": 150,
+    "usd": 0.0
+  }
+}

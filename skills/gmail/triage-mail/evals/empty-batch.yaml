@@ -1,0 +1,25 @@
+# Synthetic data. The input is the collect step's output for pipelines/triage-mail.yaml:
+# the mail the rules did not decide, as gmail.triage returns it.
+schema_version: 1
+description: "Nothing needs interpretation (the rules decided everything): empty answer."
+budget: { usd: 0.05, tokens_out: 2000 }
+input:
+  - source: gmail.triage
+    params: {"state_path": "/var/lib/horae/gmail-state.json", "account": "mail", "max_messages": 25}
+    data:
+      account: "mail"
+      baselined: false
+      reset: false
+      decisions: []
+      counts: {"ignore": 0, "task": 0, "interpret": 0, "decided": 0}
+      needs_interpretation: []
+      truncated: false
+      skipped: 0
+      state_updated: true
+expect:
+  schema_valid: true
+  assertions:
+    - {"pointer": "/output/triaged", "length": 0}
+    - {"pointer": "/intents", "length": 0}
+  intent_counts: { task.create: 0 }
+  guard: pass

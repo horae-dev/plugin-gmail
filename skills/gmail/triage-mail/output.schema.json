@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "triaged", "intents"],
+  "properties": {
+    "summary": { "type": "string", "maxLength": 200 },
+    "triaged": {
+      "type": "array",
+      "maxItems": 25,
+      "items": { "$ref": "#/$defs/triaged" }
+    },
+    "intents": {
+      "type": "array",
+      "maxItems": 25,
+      "items": { "$ref": "#/$defs/task" }
+    }
+  },
+  "$defs": {
+    "triaged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message_id", "outcome", "confidence", "title", "due"],
+      "properties": {
+        "message_id": { "type": "string", "maxLength": 64 },
+        "outcome": { "type": "string", "enum": ["task", "no_task", "suspicious"] },
+        "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+        "title": { "type": "string", "maxLength": 120 },
+        "due": {
+          "anyOf": [{ "type": "string", "maxLength": 10 }, { "type": "null" }]
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title", "fingerprint", "due"],
+      "properties": {
+        "type": { "type": "string", "const": "task.create" },
+        "title": { "type": "string", "maxLength": 120 },
+        "fingerprint": { "type": "string", "maxLength": 80 },
+        "due": {
+          "anyOf": [{ "type": "string", "maxLength": 10 }, { "type": "null" }]
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 [project]
 name = "horae-plugin-gmail"
-version = "0.1.0"
-description = "The Gmail Horae plugin: OAuth and token lifecycle, read-only recent message headers."
+version = "0.2.0"
+description = "The Gmail Horae plugin: OAuth, read-only recent headers, and rules-first triage into tasks."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
@@ -20,6 +20,7 @@ packages = ["src/horae_gmail"]
 
 [dependency-groups]
 dev = [
+    "horae",
     "mypy>=2.4",
     "pre-commit>=4.7",
     "pytest>=9.1",
@@ -34,6 +35,9 @@ dev = [
 # Once horae-sdk is published, delete this table: the requirement above then resolves from PyPI.
 [tool.uv.sources]
 horae-sdk = { git = "https://github.com/horae-dev/horae", branch = "main", subdirectory = "sdk" }
+# The core itself, for the tests only: the golden cases of the triage skill run through its
+# `horae eval` and the public replay backend (`horae.llm.replay`), offline.
+horae = { git = "https://github.com/horae-dev/horae", branch = "main" }
 
 [tool.uv]
 required-version = ">=0.13"

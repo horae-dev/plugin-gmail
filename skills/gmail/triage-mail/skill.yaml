@@ -1,0 +1,29 @@
+# The triage-mail skill (schemas decision 39): the one LLM step of the Gmail triage. It sees
+# only the mail the user's rules did NOT decide (`gmail.triage` returns it as
+# `data.needs_interpretation`); mail a rule ignored or turned into a task is never in its input.
+#
+# The input view is everything the model sees. Not shown: the rules, the decisions, the
+# thread ids, the state path and every other parameter. A missing field is not an error.
+#
+# `from`, `subject` and `snippet` were written by whoever sent the mail: `class: free_text`
+# marks them. The snippet is already one inert, capped line of the plain-text body (no HTML,
+# no attachment); the view adds nothing else of the body.
+#
+# `links: none`: the guard refuses every link and URL in the answer (the task needs none, and
+# a link in a mail must never reach a task), even one whose URL is in a viewed snippet.
+name: gmail/triage-mail
+version: 0.1.0
+links: none
+description: Turn the mail that needs interpretation into task proposals.
+input_view:
+  "[].source":
+  "[].data.truncated":
+  "[].data.needs_interpretation[].id":
+  "[].data.needs_interpretation[].from": { class: free_text }
+  "[].data.needs_interpretation[].subject": { class: free_text }
+  "[].data.needs_interpretation[].date":
+  "[].data.needs_interpretation[].snippet": { class: free_text }
+prompt: prompt.md
+output_schema: output.schema.json
+intents:
+  task.create: 25

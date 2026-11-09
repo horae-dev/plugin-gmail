@@ -124,8 +124,12 @@ def test_no_modify_or_send_scope_exists_in_the_source() -> None:
     from pathlib import Path
 
     source = "".join(p.read_text("utf-8") for p in Path(oauth.__file__).parent.glob("*.py"))
-    for word in ("gmail.modify", "gmail.send", "gmail.compose", "gmail.insert", "mail.google.com"):
+    for word in ("gmail.modify", "gmail.send", "gmail.compose", "gmail.insert"):
         assert word not in source, word
+    # The full-mailbox scope is the bare `https://mail.google.com/`; the triage's task link
+    # (`https://mail.google.com/mail/u/0/#all/<id>`) is a link, never requested or contacted.
+    for quote in ('"', "'"):
+        assert f"{quote}https://mail.google.com/{quote}" not in source
 
 
 @pytest.mark.parametrize(
