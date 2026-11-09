@@ -1,0 +1,30 @@
+# Synthetic data. The input is the collect step's output for pipelines/triage-mail.yaml:
+# the mail the rules did not decide, as gmail.triage returns it.
+schema_version: 1
+description: "A meeting request becomes a reply task without an invented date."
+budget: { usd: 0.05, tokens_out: 2000 }
+input:
+  - source: gmail.triage
+    params: {"state_path": "/var/lib/horae/gmail-state.json", "account": "mail", "max_messages": 25}
+    data:
+      account: "mail"
+      baselined: false
+      reset: false
+      decisions:
+        - {"id": "18f0b0000000a002", "thread_id": "18f0b0000000a002", "action": "interpret", "decided": false, "rule": null}
+      counts: {"ignore": 0, "task": 0, "interpret": 1, "decided": 0}
+      needs_interpretation:
+        - {"id": "18f0b0000000a002", "from": "Ada Example \\<ada@example.org\\>", "subject": "Meeting Thursday?", "date": "Mon, 02 Nov 2026 09:12:00 +0100", "snippet": "Hi, could we meet on Thursday afternoon to go over the budget? Let me know what time suits you. Ada"}
+      truncated: false
+      skipped: 0
+      state_updated: true
+expect:
+  schema_valid: true
+  assertions:
+    - {"pointer": "/output/triaged", "length": 1}
+    - {"pointer": "/intents", "length": 1}
+    - {"pointer": "/intents/0/fingerprint", "matches": "^gmail:[0-9a-f]{16}$"}
+    - {"pointer": "/intents/0/title", "not_contains": "http"}
+    - {"pointer": "/intents/0/due", "equals": null}
+  intent_counts: { task.create: 1 }
+  guard: pass

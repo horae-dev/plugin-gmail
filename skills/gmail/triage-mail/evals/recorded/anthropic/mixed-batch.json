@@ -1,0 +1,69 @@
+{
+  "backend": "anthropic",
+  "model": "claude-fixture-1",
+  "output": {
+    "intents": [
+      {
+        "due": "2026-11-20",
+        "fingerprint": "gmail:18f0b0000000a001",
+        "title": "Pay the Orange invoice",
+        "type": "task.create"
+      },
+      {
+        "due": null,
+        "fingerprint": "gmail:18f0b0000000a006",
+        "title": "Send Marc the scan of the lease",
+        "type": "task.create"
+      }
+    ],
+    "summary": "Two tasks, one newsletter and one suspicious mail.",
+    "triaged": [
+      {
+        "confidence": "high",
+        "due": "2026-11-20",
+        "message_id": "18f0b0000000a001",
+        "outcome": "task",
+        "title": "Pay the Orange invoice"
+      },
+      {
+        "confidence": "high",
+        "due": null,
+        "message_id": "18f0b0000000a004",
+        "outcome": "no_task",
+        "title": ""
+      },
+      {
+        "confidence": "high",
+        "due": null,
+        "message_id": "18f0b0000000a007",
+        "outcome": "suspicious",
+        "title": ""
+      },
+      {
+        "confidence": "high",
+        "due": null,
+        "message_id": "18f0b0000000a006",
+        "outcome": "task",
+        "title": "Send Marc the scan of the lease"
+      }
+    ]
+  },
+  "request": {
+    "input_sha256": "dbb12028c40ba4d9b7b21bf3e1154ab5bdeb21d2ec76c28a91260d2d8a6f573a",
+    "schema_sha256": "05bfa56076ae8d9623bd844464828a497e1a4c89f3b386a7ba8cd3b5282c9935",
+    "system_sha256": "442fb3c056bfbccb836703d92cacefe5b7124a488ba615fe59417095642e784f"
+  },
+  "schema_version": 1,
+  "skill": "gmail/triage-mail",
+  "skill_digest": "80af72e9d3317c0c51fd62d55fdd52b01885862e3492ee8bae832f88b3f52ce6",
+  "skill_version": "0.1.0",
+  "stop_reason": "end_turn",
+  "usage": {
+    "cache_read_tokens": null,
+    "cache_write_tokens": null,
+    "priced": false,
+    "tokens_in": 600,
+    "tokens_out": 150,
+    "usd": 0.0
+  }
+}

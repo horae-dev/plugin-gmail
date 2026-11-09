@@ -3,6 +3,28 @@
 Every change to tools, parameters and permissions. A new permission is called out: users
 must approve it.
 
+## 0.2.0
+
+Rules-first triage into tasks (#3).
+
+- **New permission** (users must approve it): intent `task.create`. No new host or secret.
+  The since-state file's directory is granted per instance in `horae.lock` (`paths.write`),
+  not declared. **The plugin makes no LLM call.**
+- **`gmail.triage` source**: the mail added to a label since the last run (`historyId` in a
+  JSON file at `state_path`; the first run baselines and handles nothing). Parameters:
+  `state_path`, `rules`, `account`, `label_id`, `max_messages`, `body_kib`, `snippet_chars`,
+  `update_state`. User rules (`from`, `subject`, `label`, `list_id` globs; actions `ignore`,
+  `task`, `interpret`; first match wins) give each message one decision, reported with
+  `decided`. A `task` rule proposes `task.create` with fingerprint `gmail:<message id>` and
+  the link `https://mail.google.com/mail/u/0/#all/<message id>` (routed by `link_prefix`).
+  Undecided mail is returned as `needs_interpretation`: escaped, capped snippets of the
+  plain-text body; no HTML, no attachment.
+- **Skill `gmail/triage-mail`** (`provides.skills`): strict output schema, `links: none`,
+  `task.create` up to 25, 12 golden cases run offline with `horae eval` and hand-written
+  recorded answers. `scripts/sync_recordings.py` refreshes their digests.
+- **Example pipeline** `examples/triage-mail.pipeline.yaml`.
+- Dev: `horae` (the core) as a dev dependency, for the golden-case tests.
+
 ## 0.1.0
 
 First release (#2): Gmail OAuth and the token lifecycle.
