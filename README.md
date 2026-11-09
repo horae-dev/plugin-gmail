@@ -4,6 +4,10 @@
 
 Horae plugin: rules-first Gmail triage that turns requests into tasks.
 
+> **0.2.1** ([#7](../../issues/7)): the pipeline skips the `llm` step when the rules decided
+> every mail (`skip_when_empty`), and the guard refuses a task whose fingerprint is not
+> `gmail:` + a mail id it was shown (`task_fingerprint`), schemas decision 67.
+>
 > **0.2.0: rules-first triage into tasks** ([#3](../../issues/3)). On top of 0.1.0's OAuth and
 > token lifecycle, `gmail.triage` reads the new mail, lets **your rules** decide it, and hands
 > only the rest to the core's LLM step through the skill `gmail/triage-mail`. The recorded
@@ -208,17 +212,20 @@ change together and are tested together. A `pack-mail-triage` that bundles the p
   link. At most 25 intents.
 - **Prompt injection:** the prompt says the input is data; a mail that tries to instruct the
   model is `suspicious`. The guard (decision 55) is the second line.
-- **References:** the answer must cite only ids that were in the input. The golden-case tests
-  check it (`tests/test_skill.py`); see the follow-ups for the core side.
+- **References:** the skill declares `task_fingerprint: {ids: "[].data.needs_interpretation[].id",
+  prefix: "gmail:"}`: the core's guard refuses a `task.create` whose fingerprint is not `gmail:`
+  + the id of a mail in the viewed input (a guard violation; nothing of the batch is routed).
+  The golden-case tests check the answers too (`tests/test_skill.py`).
 
 ### Golden cases (evals)
 
-`skills/gmail/triage-mail/evals/` holds 12 cases: an invoice due, a meeting request, a school
+`skills/gmail/triage-mail/evals/` holds 13 cases: an invoice due, a meeting request, a school
 notice (French, `14/11/2026`), a newsletter, a shipping notice, a personal request, a
 phishing-style "urgent" mail (flagged, no task), a vague mail (low confidence), a mixed batch
 of four, an empty batch (the rules decided everything), a prompt-injection mail answered as
 data, and the same mail answered by a model that **obeyed** (a URL in a task title), which the
-guard refuses. They assert properties (counts, references, `matches` on fingerprints,
+guard refuses, and one where the model **invented** a message id, which the skill's
+`task_fingerprint` rule refuses as a guard violation. They assert properties (counts, references, `matches` on fingerprints,
 `not_contains` on titles), never exact text.
 
 - **Offline, on every pull request** (the `test` job runs `tests/test_skill.py`):
@@ -234,16 +241,14 @@ guard refuses. They assert properties (counts, references, `matches` on fingerpr
 [`examples/triage-mail.pipeline.yaml`](examples/triage-mail.pipeline.yaml) is an example to
 copy into your instance (the core does not install a plugin's pipelines yet): collect with
 your rules, the `llm` step, and the tasks sink with `link_prefix:
-"https://mail.google.com/mail/u/0/"`. **No LLM call when rules decide:** the plugin returns
-no LLM input then, and with the same (empty) input the step's `on_unchanged_input: skip` makes
-no call after the first run. The core has no way yet to skip an `llm` step whose view is
-empty on its first run (follow-up).
+"https://mail.google.com/mail/u/0/"`. **No LLM call when rules decide:** the step's
+`skip_when_empty: ["[].data.needs_interpretation"]` makes no call, and costs nothing, when no
+mail is left for the model, from the first run (the step is recorded `skipped`).
+`on_unchanged_input: skip` stays as the second guard. The eval harness runs one skill on one
+input, so the skip is covered by a pipeline-level test (`tests/test_skip.py`).
 
 ### Follow-ups
 
-- Core: skip an `llm` step when its viewed input holds no item (a `skip_if_empty` option).
-- Core: the guard checks a `task.update_status` fingerprint against the viewed input but not a
-  `task.create` one, so a model that invents a message id is caught only by the evals here.
 - Core: a task link derived from the fingerprint, so that an LLM-made task (which cannot
   carry a link under `links: none`) links to its mail.
 - `pack-mail-triage`: the pipeline and skill as a pack, with IMAP mail through the same skill.

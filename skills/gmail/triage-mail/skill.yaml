@@ -27,3 +27,5 @@ prompt: prompt.md
 output_schema: output.schema.json
 intents:
   task.create: 25
+# A task's fingerprint is `gmail:` + a viewed mail id; the core guard refuses any other (decision 67).
+task_fingerprint: { ids: "[].data.needs_interpretation[].id", prefix: "gmail:" }

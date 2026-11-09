@@ -33,7 +33,7 @@ from horae_gmail import rules as rule_engine
 from horae_gmail.fetch import Api, FetchError, HttpFetcher, check_url
 
 NAME = "gmail"
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 SKILL = "gmail/triage-mail"
 """The skill the plugin ships (`skills/gmail/triage-mail`)."""
 LINK = "https://mail.google.com/mail/u/0/#all/"

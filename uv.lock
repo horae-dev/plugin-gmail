@@ -493,7 +493,7 @@ wheels = [
 [[package]]
 name = "horae"
 version = "0.0.0"
-source = { git = "https://github.com/horae-dev/horae?branch=main#434aac6999ee27a51d36b91b8475b7e1fd83e69d" }
+source = { git = "https://github.com/horae-dev/horae?branch=main#fdae1c8ecc0759a4df623924ab4d78cd9e5c0470" }
 dependencies = [
     { name = "anthropic" },
     { name = "cronsim" },
@@ -512,7 +512,7 @@ dependencies = [
 
 [[package]]
 name = "horae-plugin-gmail"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "horae-sdk" },
@@ -549,8 +549,8 @@ dev = [
 
 [[package]]
 name = "horae-sdk"
-version = "0.5.0"
-source = { git = "https://github.com/horae-dev/horae?subdirectory=sdk&branch=main#434aac6999ee27a51d36b91b8475b7e1fd83e69d" }
+version = "0.6.0"
+source = { git = "https://github.com/horae-dev/horae?subdirectory=sdk&branch=main#fdae1c8ecc0759a4df623924ab4d78cd9e5c0470" }
 dependencies = [
     { name = "anyio" },
     { name = "mcp" },
