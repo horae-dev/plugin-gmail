@@ -3,6 +3,19 @@
 Every change to tools, parameters and permissions. A new permission is called out: users
 must approve it.
 
+## 0.2.1
+
+Schemas decision 67 (#7). No new permission, host, secret or intent; **the plugin makes no
+LLM call**.
+
+- Skill `gmail/triage-mail`: `task_fingerprint: {ids: "[].data.needs_interpretation[].id",
+  prefix: "gmail:"}`. The core's guard refuses a `task.create` whose fingerprint is not
+  `gmail:` + a viewed mail id. The prompt states the rule.
+- `examples/triage-mail.pipeline.yaml`: `skip_when_empty: ["[].data.needs_interpretation"]` on
+  the `llm` step (no call and no cost when the rules decided every mail).
+- New golden case `invented-id` (a guard violation) and a pipeline-level test of the skip.
+  Recordings re-synced (digests only). Locked core and `horae-sdk` bumped.
+
 ## 0.2.0
 
 Rules-first triage into tasks (#3).

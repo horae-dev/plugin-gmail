@@ -24,11 +24,11 @@
   "request": {
     "input_sha256": "4f01c0849bf22c98591202cd54ec5bde630b5b075dbc97ab758c7039785ad736",
     "schema_sha256": "05bfa56076ae8d9623bd844464828a497e1a4c89f3b386a7ba8cd3b5282c9935",
-    "system_sha256": "442fb3c056bfbccb836703d92cacefe5b7124a488ba615fe59417095642e784f"
+    "system_sha256": "6a518c7663be4e657d56e05b9ff93a9bfa7c80f215f1be60d957263453e0d5fb"
   },
   "schema_version": 1,
   "skill": "gmail/triage-mail",
-  "skill_digest": "80af72e9d3317c0c51fd62d55fdd52b01885862e3492ee8bae832f88b3f52ce6",
+  "skill_digest": "4f1f6e1dc8d2d28818e26f60db600b5dbcbdb1d4999a86c694c2501eb2882982",
   "skill_version": "0.1.0",
   "stop_reason": "end_turn",
   "usage": {

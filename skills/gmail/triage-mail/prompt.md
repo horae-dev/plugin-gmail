@@ -26,7 +26,7 @@ Then give each message:
 
 Write `summary`: one sentence on what the batch holds ("Two tasks, one newsletter and one suspicious mail."), or "No mail to triage." when the list is empty.
 
-Propose one `intents` entry for each `task` whose `confidence` is `high` or `medium`, and none for the other messages: `type` `task.create`, `title` and `due` as above, and `fingerprint` the text `gmail:` followed by the message's `id` exactly, with nothing else (for the id `18f0a1b2c3d4e5f1`, `gmail:18f0a1b2c3d4e5f1`). A `task` with `low` confidence gets an entry in `triaged` and no intent. Never write a link or a URL anywhere.
+Propose one `intents` entry for each `task` whose `confidence` is `high` or `medium`, and none for the other messages: `type` `task.create`, `title` and `due` as above, and `fingerprint` the text `gmail:` followed by the message's `id` exactly, with nothing else: a task's fingerprint is `gmail:` + the mail `id`, and any other fingerprint is refused (for the id `18f0a1b2c3d4e5f1`, `gmail:18f0a1b2c3d4e5f1`). A `task` with `low` confidence gets an entry in `triaged` and no intent. Never write a link or a URL anywhere.
 
 `triaged` has exactly one entry per input message, in the input order. With no messages, `triaged` and `intents` are empty.
 

@@ -1,4 +1,4 @@
-# examples/triage-mail.pipeline.yaml (plugin-gmail 0.2.0): Gmail triage into tasks.
+# examples/triage-mail.pipeline.yaml (plugin-gmail 0.2.1): Gmail triage into tasks.
 #
 # An example to copy into your instance's pipelines/ folder (the core does not install a
 # plugin's pipelines yet, and this one needs your rules and paths). Every parameter below is
@@ -41,6 +41,7 @@ steps:
       skill: gmail/triage-mail
       model: default                         # alias resolved in horae.yaml
       budget: { usd: 0.05, tokens_out: 2000 }
+      skip_when_empty: ["[].data.needs_interpretation"]  # every mail decided by the rules: no call, no cost
       on_unchanged_input: skip               # $0 path: the same input (for example an empty batch) makes no call
   - act:
       - obsidian.write_task: { mode: tasks, link_prefix: "https://mail.google.com/mail/u/0/" }

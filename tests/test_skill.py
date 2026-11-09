@@ -32,6 +32,8 @@ MAIL_TYPES = {
 }
 OBEYED = {"injected-link": "violation"}
 """A model that obeyed an injection, and what the action guard does with it."""
+INVENTED = {"invented-id": "violation"}
+"""A model that invented a message id: the skill's `task_fingerprint` rule refuses it."""
 
 
 def _eval() -> tuple[int, Any]:
@@ -49,11 +51,11 @@ def test_every_golden_case_passes_offline_and_none_is_stale() -> None:
     assert summary["errors"] == 0
     # A stale recording: run scripts/sync_recordings.py (hand-written answers only).
     assert summary["stale"] == 0, [(c["case"], c["stale"]) for c in report["cases"]]
-    assert summary["passed"] == summary["cases"] == len(MAIL_TYPES) + len(OBEYED)
+    assert summary["passed"] == summary["cases"] == len(MAIL_TYPES) + len(OBEYED) + len(INVENTED)
 
 
 def test_the_cases_are_the_common_mail_types_and_the_obeyed_injection() -> None:
-    assert set(cases()) == MAIL_TYPES | set(OBEYED)
+    assert set(cases()) == MAIL_TYPES | set(OBEYED) | set(INVENTED)
 
 
 def test_every_case_is_recorded_for_the_default_backend_by_hand() -> None:
@@ -64,7 +66,7 @@ def test_every_case_is_recorded_for_the_default_backend_by_hand() -> None:
 def test_the_guard_on_the_obeyed_injection() -> None:
     _, report = _eval()
     guard = {c["case"]: c["guard"] for c in report["cases"]}
-    for name, expected in OBEYED.items():
+    for name, expected in (OBEYED | INVENTED).items():
         assert cases()[name].case.expect.guard == expected, name
         assert guard[name] == expected, name
 
@@ -107,8 +109,10 @@ def test_each_golden_answer_cites_only_messages_that_were_in_its_input() -> None
     """The reference check: a model that cites an id it was not shown (a hallucinated
     fingerprint) is caught here for the golden answers, and by the same helper in the test
     below. The core's guard checks a `task.update_status` fingerprint against the viewed
-    input; it has no such check for a `task.create` (see the README, "Follow-ups")."""
+    input; for a `task.create` the skill's `task_fingerprint` rule does the same (decision 67)."""
     for name, loaded in cases().items():
+        if name in INVENTED:
+            continue  # its answer invents an id on purpose; the guard refuses it
         shown = message_ids(loaded.case.input)
         output = loaded.recorded["anthropic"].output
         assert referenced_ids(output) <= shown, name
