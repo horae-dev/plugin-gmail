@@ -1,0 +1,25 @@
+# Written by `uv run python -m horae_gmail --manifest > plugin.yaml`; tests/test_manifest.py
+# checks it is what the SDK writes. When installing, pin runtime.command to an absolute
+# interpreter that has this package (horae-sdk README, "The command").
+name: gmail
+version: 0.1.0
+horae: '>=0,<0.2'
+description: Recent Gmail message ids and headers (From, Subject, Date), read-only.
+license: Apache-2.0
+provides:
+  sources:
+  - gmail.recent
+permissions:
+  network:
+  - gmail.googleapis.com
+  - oauth2.googleapis.com
+  secrets:
+  - GMAIL_CLIENT_ID
+  - GMAIL_CLIENT_SECRET
+  - GMAIL_REFRESH_TOKEN
+runtime:
+  protocol: mcp-stdio
+  command:
+  - python3
+  - -m
+  - horae_gmail

@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+"""`python -m horae_gmail` serves the plugin over stdio; `--manifest` prints `plugin.yaml`;
+`google-auth` runs the one-time Google consent on the user's machine (never while serving)."""
+
+import sys
+
+from horae_sdk import dump_manifest
+
+from horae_gmail.plugin import build, manifest
+
+HEADER = """\
+# Written by `uv run python -m horae_gmail --manifest > plugin.yaml`; tests/test_manifest.py
+# checks it is what the SDK writes. When installing, pin runtime.command to an absolute
+# interpreter that has this package (horae-sdk README, "The command").
+"""
+USAGE = "usage: python -m horae_gmail [--manifest | google-auth [--scope SCOPE] [--no-browser]]"
+
+
+def main(argv: list[str]) -> None:
+    if argv == ["--manifest"]:
+        sys.stdout.write(HEADER + dump_manifest(manifest()))
+        return
+    if argv[:1] == ["google-auth"]:
+        from horae_gmail import consent
+
+        consent.main(argv[1:])
+        return
+    if argv:
+        sys.exit(USAGE)
+    # Never print while serving: stdout is the protocol channel.
+    build().run()
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
