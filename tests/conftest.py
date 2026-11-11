@@ -26,6 +26,13 @@ ENVIRON = {
     "GMAIL_REFRESH_TOKEN": REFRESH,
 }
 SENSITIVE = (CLIENT_SECRET, REFRESH, ACCESS)
+LABELS = [
+    {"id": "INBOX", "name": "INBOX"},
+    {"id": "CATEGORY_PROMOTIONS", "name": "CATEGORY_PROMOTIONS"},
+    {"id": "Label_101", "name": "Receipts"},
+    {"id": "Label_102", "name": "Clients/Acme"},
+    {"id": "Label_103", "name": "Clients/Globex"},
+]
 APPROVED = ["gmail.googleapis.com", "oauth2.googleapis.com"]
 
 
@@ -115,6 +122,8 @@ class FakeGoogle:
         self.history: list[dict[str, Any]] = []
         self.profile_id = "5000"
         self.latest_id = "5000"
+        self.labels: list[dict[str, str]] = list(LABELS)
+        """The mailbox's labels (`labels.list`), synthetic."""
 
     async def api(
         self,
@@ -141,6 +150,8 @@ class FakeGoogle:
             return 200, recorded("token")
         if route == "profile":
             return 200, json.dumps({"historyId": self.profile_id}).encode()
+        if route == "labels":
+            return 200, json.dumps({"labels": self.labels}).encode()
         if route == "history":
             answer: dict[str, Any] = {"history": self.history, "historyId": self.latest_id}
             return 200, json.dumps(answer).encode()
@@ -163,6 +174,8 @@ class FakeGoogle:
         assert method == "GET"
         if path == "/gmail/v1/users/me/profile":
             return "profile"
+        if path == "/gmail/v1/users/me/labels":
+            return "labels"
         if path == "/gmail/v1/users/me/history":
             return "history"
         prefix = "/gmail/v1/users/me/messages"

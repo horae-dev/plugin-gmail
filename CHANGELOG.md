@@ -3,6 +3,30 @@
 Every change to tools, parameters and permissions. A new permission is called out: users
 must approve it.
 
+## 0.3.0
+
+Triage follow-ups (#6, items 1 and 2). **No new permission, host, secret, intent or scope**
+(`plugin.yaml` changes only its version); **the plugin makes no LLM call**.
+
+- **Labels by name.** `label_id` and the rules' `label` matchers take a label id or a label
+  name. Names are resolved with `users.labels.list` (a GET that `gmail.readonly` and
+  `gmail.metadata` already allow), at most once per run and only when a name or custom id must
+  be resolved: system label ids need no call. Resolution: exact id, then exact-case name, then
+  name ignoring case. A missing reference fails the run with `label_not_found`, an ambiguous
+  one with `label_ambiguous` (the ids are listed); the state does not move. Wildcard matchers
+  (`Clients/*`) are also tried against label names. `label_id` is no longer limited to the id
+  characters (a name may hold spaces and `/`).
+- **Behaviour change**: a literal `label` id that is not a system label (`Label_12`) is now
+  checked against the mailbox, so one that no longer exists fails the run instead of never
+  matching.
+- **Multi-account links.** New `gmail.triage` parameter `account_index` (0 to 99, default
+  `0`): task links are `https://mail.google.com/mail/u/<account_index>/#all/<message id>`.
+  The fingerprint does not change. The pipeline's `link_prefix` must cover that path:
+  `https://mail.google.com/mail/u/<n>/` for one account, `https://mail.google.com/mail/u/` for
+  all. The manifest declares no `link_prefix`, so it is unchanged; the example pipeline
+  documents the rule.
+- Not done here (left in #6): the move to `pack-mail-triage` and live evals.
+
 ## 0.2.1
 
 Schemas decision 67 (#7). No new permission, host, secret or intent; **the plugin makes no

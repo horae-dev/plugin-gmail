@@ -28,19 +28,23 @@ from typing import Any
 from horae_sdk import Call, Output, Permissions, Plugin, PluginError, intents
 from horae_sdk import manifest as build_manifest
 
-from horae_gmail import gmail, mail, oauth, state, triage
+from horae_gmail import gmail, labels, mail, oauth, state, triage
 from horae_gmail import rules as rule_engine
 from horae_gmail.fetch import Api, FetchError, HttpFetcher, check_url
 
 NAME = "gmail"
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 SKILL = "gmail/triage-mail"
 """The skill the plugin ships (`skills/gmail/triage-mail`)."""
-LINK = "https://mail.google.com/mail/u/0/#all/"
-"""A task's link is this and the message id. Google is never contacted at this address (it is
-not in `HOSTS`): the core only routes the link under the `tasks` entry's `link_prefix`."""
+LINK = "https://mail.google.com/mail/u/{index}/#all/"
+"""A task's link is this (`index`: the Gmail account index, `account_index`) and the message
+id. Google is never contacted at this address (it is not in `HOSTS`): the core only routes the
+link under the `tasks` entry's `link_prefix`, which must cover `/mail/u/<account_index>/`
+(`link_prefix_for`)."""
+LINK_PREFIX = "https://mail.google.com/mail/u/"
+MAX_ACCOUNT_INDEX = 99
 LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}")
-LABEL_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+MAX_LABEL_REF = labels.MAX_NAME
 MAX_MESSAGES = 100
 """Per call (the SDK refuses more than 256 intents)."""
 MAX_BODY_KIB = 64
@@ -102,6 +106,7 @@ def build(api: Api | None = None, *, environ: Mapping[str, str] | None = None) -
         state_path: str | None = None,
         account: str = "mail",
         label_id: str = "INBOX",
+        account_index: int = 0,
         rules: list[dict[str, Any]] | None = None,
         max_messages: int = 25,
         body_kib: int = 16,
@@ -111,14 +116,17 @@ def build(api: Api | None = None, *, environ: Mapping[str, str] | None = None) -
         """The mail that arrived in `label_id` since the last run (the `historyId` kept in
         `state_path`), read-only. Each message gets exactly one decision from `rules`: ignore,
         task (a `task.create` intent) or interpret, and a message no rule matches is
-        `interpret`. Only the `interpret` messages are returned for the core's LLM step, as
-        capped, escaped snippets of the plain-text body (no HTML, no attachment)."""
+        `interpret`. `label_id` and the rules' `label` matchers take a label id or name. Task
+        links open Gmail account `account_index` (`/mail/u/<n>/`). Only the `interpret`
+        messages are returned for the core's LLM step, as capped, escaped snippets of the
+        plain-text body (no HTML, no attachment)."""
         opts = _options(
             call,
             {
                 "state_path": state_path,
                 "account": account,
                 "label_id": label_id,
+                "account_index": account_index,
                 "rules": rules,
                 "max_messages": max_messages,
                 "body_kib": body_kib,
@@ -164,6 +172,7 @@ class Options:
     state_path: str
     account: str
     label_id: str
+    account_index: int
     rules: tuple[rule_engine.Rule, ...]
     max_messages: int
     body_bytes: int
@@ -188,14 +197,20 @@ def _options(call: Call, params: Mapping[str, Any]) -> Options:
     account, label_id = params["account"], params["label_id"]
     if not isinstance(account, str) or not LABEL.fullmatch(account):
         raise PluginError("config_invalid: account is 1 to 32 of A-Z a-z 0-9 . _ -")
-    if not isinstance(label_id, str) or not LABEL_ID.fullmatch(label_id):
-        raise PluginError("config_invalid: label_id is a Gmail label id such as INBOX")
+    if (
+        not isinstance(label_id, str)
+        or not 1 <= len(label_id) <= MAX_LABEL_REF
+        or not label_id.isprintable()
+        or label_id != label_id.strip()
+    ):
+        raise PluginError("config_invalid: label_id is a Gmail label id or name such as INBOX")
     if params["update_state"] is not True and params["update_state"] is not False:
         raise PluginError("config_invalid: update_state is true or false")
     return Options(
         state_path=real,
         account=account,
         label_id=label_id,
+        account_index=_bounded(params["account_index"], "account_index", 0, MAX_ACCOUNT_INDEX),
         rules=rule_engine.parse_rules(params["rules"]),
         max_messages=_bounded(params["max_messages"], "max_messages", 1, MAX_MESSAGES),
         body_bytes=_bounded(params["body_kib"], "body_kib", 1, MAX_BODY_KIB) * 1024,
@@ -204,7 +219,13 @@ def _options(call: Call, params: Mapping[str, Any]) -> Options:
     )
 
 
-def _task(message: mail.Message, rule: rule_engine.Rule) -> dict[str, Any]:
+def link_prefix_for(account_index: int) -> str:
+    """The `link_prefix` of the pipeline's tasks entry that covers the links of an account:
+    `https://mail.google.com/mail/u/<account_index>/`. `LINK_PREFIX` itself covers them all."""
+    return f"{LINK_PREFIX}{account_index}/"
+
+
+def _task(message: mail.Message, rule: rule_engine.Rule, account_index: int = 0) -> dict[str, Any]:
     """The `task.create` of a message a rule made a task: the fingerprint and the link come
     from the message id, the title from the subject (escaped by the SDK)."""
     due = None
@@ -215,12 +236,33 @@ def _task(message: mail.Message, rule: rule_engine.Rule) -> dict[str, Any]:
         title,
         key=intents.fingerprint(NAME, message.id),
         due=due,
-        link=f"{LINK}{message.id}",
+        link=f"{LINK.format(index=account_index)}{message.id}",
     )
+
+
+async def _labels(
+    api: gmail.Gmail, opts: Options
+) -> tuple[labels.Labels | None, str, tuple[rule_engine.Rule, ...]]:
+    """The label list (one `labels.list` call, only when a name or a custom id has to be
+    resolved), the id of `label_id` and the rules with their label names resolved. A name that
+    is missing or ambiguous refuses the call before any mail is read, and the state does not
+    move."""
+    if opts.label_id not in labels.SYSTEM_IDS or rule_engine.uses_labels(opts.rules):
+        known = await labels.fetch(api, gmail.API_URL)
+        try:
+            return (
+                known,
+                known.resolve(opts.label_id),
+                rule_engine.resolve_labels(opts.rules, known),
+            )
+        except labels.LabelError as error:
+            raise PluginError(str(error)) from None
+    return None, opts.label_id, opts.rules
 
 
 async def _triage(api: gmail.Gmail, opts: Options) -> Output:
     previous = state.load(opts.state_path)
+    known, label_id, rules = await _labels(api, opts)
     start = previous.get(opts.account)
     reset = baselined = False
     truncated = False
@@ -230,9 +272,7 @@ async def _triage(api: gmail.Gmail, opts: Options) -> Output:
         reached, baselined = await triage.current(api), True
     else:
         try:
-            ids, reached, truncated = await triage.new_ids(
-                api, start, opts.label_id, opts.max_messages
-            )
+            ids, reached, truncated = await triage.new_ids(api, start, label_id, opts.max_messages)
         except triage.HistoryExpired:
             reached, reset = await triage.current(api), True
         else:
@@ -242,7 +282,7 @@ async def _triage(api: gmail.Gmail, opts: Options) -> Output:
     proposed: list[dict[str, Any]] = []
     counts = {"ignore": 0, "task": 0, "interpret": 0}
     for message in found:
-        decision = rule_engine.decide(opts.rules, message)
+        decision = rule_engine.decide(rules, message, known)
         counts[decision.action] += 1
         decisions.append(
             {
@@ -254,7 +294,7 @@ async def _triage(api: gmail.Gmail, opts: Options) -> Output:
             }
         )
         if decision.action == "task" and decision.rule is not None:
-            proposed.append(_task(message, decision.rule))
+            proposed.append(_task(message, decision.rule, opts.account_index))
         elif decision.action == "interpret":
             interpret.append(
                 {
