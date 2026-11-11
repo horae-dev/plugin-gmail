@@ -4,6 +4,11 @@
 
 Horae plugin: rules-first Gmail triage that turns requests into tasks.
 
+> **0.3.0** ([#6](../../issues/6)): labels can be named (`label: [Receipts]`, `label_id:
+> Receipts`), resolved to ids with one `labels.list` call per run, and `account_index` makes
+> task links open the right Gmail account (`/mail/u/<n>/`). **No new permission**: same scopes,
+> hosts, secrets and intents.
+>
 > **0.2.1** ([#7](../../issues/7)): the pipeline skips the `llm` step when the rules decided
 > every mail (`skip_when_empty`), and the guard refuses a task whose fingerprint is not
 > `gmail:` + a mail id it was shown (`task_fingerprint`), schemas decision 67.
@@ -88,7 +93,8 @@ your rules, and returns one decision per message.
 | `state_path` | required | absolute path of the JSON file that keeps the since-state; its directory must be approved for writing in `horae.lock` (`paths.write`) |
 | `rules` | none | the rules below; with none, every message needs interpretation |
 | `account` | `mail` | a label (A-Z a-z 0-9 . _ -, at most 32): the state key |
-| `label_id` | `INBOX` | the Gmail label id whose new mail is read |
+| `label_id` | `INBOX` | the label whose new mail is read: a label id or a label name (see [Labels](#labels)) |
+| `account_index` | `0` | 0 to 99: the Gmail account of the task links, `https://mail.google.com/mail/u/<n>/` (see [Multiple accounts](#multiple-accounts)) |
 | `max_messages` | `25` | 1 to 100 messages per call |
 | `body_kib` | `16` | 1 to 64 KiB of the plain-text body read |
 | `snippet_chars` | `300` | 50 to 1000 characters of snippet sent to the LLM step |
@@ -132,7 +138,7 @@ rule that matches wins**, so a message gets one decision.
 rules:
   - name: promotions                 # 1 to 40 of A-Z a-z 0-9 . _ -
     action: ignore                   # ignore | task | interpret
-    label: [CATEGORY_PROMOTIONS]     # Gmail label ids (system labels, or Label_12 for yours)
+    label: [CATEGORY_PROMOTIONS]     # a label id or name (Label_12, Receipts), see "Labels"
   - name: newsletters
     action: ignore
     list_id: ["*"]                   # "*" means "has a List-Id header"
@@ -154,15 +160,64 @@ rules:
 - `ignore`: nothing happens. `task`: a `task.create` (below). `interpret`: to the LLM step.
   A message no rule matches **needs interpretation** too.
 
+### Labels
+
+`label_id` and a rule's `label` matchers take a label **id** (`INBOX`, `Label_12`) or a label
+**name** (`Receipts`, `Clients/Acme`). Names are resolved with Gmail's `users.labels.list`,
+called **once per run** and kept in memory for that run, and only when needed: the system
+label ids (`INBOX`, `CATEGORY_PROMOTIONS`...) never need it, so a configuration that names
+only those makes no extra call.
+
+- A reference without a wildcard is resolved to **one label id**: first an exact id, then a
+  name with the exact case, then a name ignoring case.
+- **Missing**: no label has that id or name. The run fails with `label_not_found: ...`
+  before any mail is read; the state does not move. (A rule that never matches because of a
+  typo would be silent otherwise.) This includes a custom id that no longer exists.
+- **Ambiguous**: several labels match at the step that found something (for example `work`
+  and `WORK`). The run fails with `label_ambiguous: ...`, lists the ids and asks you to use
+  the id. Nothing is guessed.
+- A matcher with a wildcard (`Clients/*`) is tried, ignoring case, against the id and the
+  name of each label the message has; it is not resolved, so it can neither be missing nor
+  ambiguous.
+- Label names are your own text: they are never returned in the output or put in an error
+  (only your reference and ids).
+
+`labels.list` is allowed by the scopes the plugin already uses (`gmail.readonly` and
+`gmail.metadata`): **no scope, host or permission is added**.
+
 ### Tasks from rules
 
 A `task` rule proposes a `task.create` with the title `task_prefix` + the subject (escaped by
 the SDK), a `due` of `due_in_days` after the message's day when set, the fingerprint
 **`gmail:<message id>`** (stable across runs: the core does not create it twice) and the link
-`https://mail.google.com/mail/u/0/#all/<message id>`. The link is built from the id, never
-from anything in the mail. The core routes it only to a `mode: tasks` entry whose trusted
-`link_prefix` covers it (`https://mail.google.com/mail/u/0/`), or the step fails with
-`intent_unrouted`. The plugin never contacts `mail.google.com`.
+`https://mail.google.com/mail/u/<account_index>/#all/<message id>`. The link is built from
+the id, never from anything in the mail. The core routes it only to a `mode: tasks` entry
+whose trusted `link_prefix` covers it (see below); a task whose link is outside every prefix
+is skipped by the core, which logs `task link not under a trusted link_prefix`. The plugin
+never contacts `mail.google.com`.
+
+### Multiple accounts
+
+When you are signed in to several Google accounts in your browser, Gmail addresses them as
+`/mail/u/0/`, `/mail/u/1/`... A link to the wrong index opens another account's mailbox.
+Set **`account_index`** (0 to 99, default `0`) to the index of the account this instance
+reads. (`account`, the state key, is a separate label; give each mailbox its own `account`,
+`state_path` and `account_index`.) The index is a position in your browser session, not an
+address: no e-mail address is put in a link or a config.
+
+**`link_prefix`.** The plugin manifest declares no `link_prefix` (it is a parameter of the
+pipeline's tasks entry, trusted configuration), so `plugin.yaml` is unchanged. The prefix in
+your pipeline must cover the link's `/mail/u/<account_index>/` path:
+
+| `link_prefix` | Covers |
+|---|---|
+| `https://mail.google.com/mail/u/1/` | only account 1: the narrowest, **recommended** |
+| `https://mail.google.com/mail/u/` | every account index (`/mail/u/<n>/`) |
+| `https://mail.google.com/mail/u/0/` | only account 0: **not** account 1 (the old example) |
+
+`link_prefix` also accepts a list of prefixes. The core compares the parsed link, so the
+`#all/<id>` fragment is not part of the check. `tests/test_links.py` runs the core's own
+routing for these cases.
 
 ### Since-state
 
@@ -241,7 +296,7 @@ guard refuses, and one where the model **invented** a message id, which the skil
 [`examples/triage-mail.pipeline.yaml`](examples/triage-mail.pipeline.yaml) is an example to
 copy into your instance (the core does not install a plugin's pipelines yet): collect with
 your rules, the `llm` step, and the tasks sink with `link_prefix:
-"https://mail.google.com/mail/u/0/"`. **No LLM call when rules decide:** the step's
+"https://mail.google.com/mail/u/0/"` (the prefix of `account_index: 0`; change both together). **No LLM call when rules decide:** the step's
 `skip_when_empty: ["[].data.needs_interpretation"]` makes no call, and costs nothing, when no
 mail is left for the model, from the first run (the step is recorded `skipped`).
 `on_unchanged_input: skip` stays as the second guard. The eval harness runs one skill on one
@@ -252,8 +307,9 @@ input, so the skip is covered by a pipeline-level test (`tests/test_skip.py`).
 - Core: a task link derived from the fingerprint, so that an LLM-made task (which cannot
   carry a link under `links: none`) links to its mail.
 - `pack-mail-triage`: the pipeline and skill as a pack, with IMAP mail through the same skill.
-- Label names (`label: [Receipts]`) need `labels.list`; today labels are matched by id.
-- A multi-account link (`/mail/u/1/`) and a live eval on a release tag.
+- Left for later, see [#6](../../issues/6): moving the pipeline and skill to
+  `pack-mail-triage` (needs a new repository, which the maintainer creates), and a live eval
+  on a release tag (needs real accounts and a spend cap).
 
 ## Which scope
 

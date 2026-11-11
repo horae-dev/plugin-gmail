@@ -1,6 +1,6 @@
 [project]
 name = "horae-plugin-gmail"
-version = "0.2.1"
+version = "0.3.0"
 description = "The Gmail Horae plugin: OAuth, read-only recent headers, and rules-first triage into tasks."
 readme = "README.md"
 license = "Apache-2.0"

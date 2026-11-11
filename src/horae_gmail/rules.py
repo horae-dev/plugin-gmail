@@ -2,10 +2,11 @@
 """The user's rules: configuration (trusted) matched against a message (untrusted), no LLM.
 
 A rule has a `name`, an `action` and matchers on the sender's address (`from`), the subject
-(`subject`), the labels (`label`, Gmail label ids such as `CATEGORY_PROMOTIONS`) and the
-`List-Id` (`list_id`). Each matcher is a list of case-insensitive `fnmatch` patterns (`*`, `?`,
-`[...]`); a field matches when any of its patterns does, and the rule matches when every field
-it names does. At least one matcher is required, so no rule matches everything by accident.
+(`subject`), the labels (`label`: Gmail label ids such as `CATEGORY_PROMOTIONS`, or label
+names) and the `List-Id` (`list_id`). Each matcher is a list of case-insensitive `fnmatch`
+patterns (`*`, `?`,
+`[...]`); a field matches when any of its patterns does, and the rule matches when every
+field it names does. At least one matcher is required, so no rule matches everything by accident.
 Rules are tried in order and **the first match wins: every message gets exactly one decision**.
 
 - `ignore`: nothing happens. Decided by the rules.
@@ -16,6 +17,12 @@ Rules are tried in order and **the first match wins: every message gets exactly 
 
 A message no rule matches **needs interpretation** too (`action: interpret`, `rule: null`).
 
+**Labels by id or name.** A `label` pattern without a wildcard names one label: it is resolved
+to its id once per run (`resolve_labels`, `labels.py`): an unknown or ambiguous one fails the
+run with `label_not_found` / `label_ambiguous` instead of silently never matching. A pattern
+with a wildcard (`Clients/*`) is tried, ignoring case, against the id and the name of each
+label the message has.
+
 Patterns are globs, not regular expressions, and run on fields cut to `MATCH_CHARS`, so a
 hostile message cannot make a rule slow.
 """
@@ -23,11 +30,12 @@ hostile message cannot make a rule slow.
 import fnmatch
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from horae_sdk import PluginError
 
+from horae_gmail import labels as label_lookup
 from horae_gmail.mail import MATCH_CHARS, Message
 
 MAX_RULES = 64
@@ -46,7 +54,7 @@ class Rule:
     name: str
     action: Action
     patterns: tuple[tuple[str, tuple[str, ...]], ...]
-    """`(field, lower-case patterns)` for each matcher the rule names."""
+    """`(field, patterns)` for each matcher the rule names (lower-case, except `label`)."""
     task_prefix: str
     due_in_days: int | None
 
@@ -111,7 +119,8 @@ def parse_rules(value: object) -> tuple[Rule, ...]:
                     f"{where}.{field} must list 1 to {MAX_PATTERNS} patterns "
                     f"of 1 to {MAX_PATTERN} characters"
                 )
-            patterns.append((field, tuple(p.lower() for p in given)))
+            keep = field == "label"  # a label name is resolved with its case (`resolve_labels`)
+            patterns.append((field, tuple(p if keep else p.lower() for p in given)))
         if not patterns:
             raise PluginError(f"{where} needs at least one of from, subject, label, list_id")
         seen.add(name)
@@ -119,26 +128,74 @@ def parse_rules(value: object) -> tuple[Rule, ...]:
     return tuple(rules)
 
 
-def _values(message: Message, field: str) -> tuple[str, ...]:
+def uses_labels(rules: Sequence[Rule]) -> bool:
+    """Whether any rule has a `label` pattern that needs the label list: a name, a custom id
+    or a wildcard (which is tried against names too)."""
+    return any(
+        pattern not in label_lookup.SYSTEM_IDS
+        for rule in rules
+        for field, patterns in rule.patterns
+        if field == "label"
+        for pattern in patterns
+    )
+
+
+def resolve_labels(rules: Sequence[Rule], labels: label_lookup.Labels) -> tuple[Rule, ...]:
+    """`rules` with each literal `label` pattern replaced by the id it names
+    (`LabelError` when it names none or several)."""
+    resolved: list[Rule] = []
+    for rule in rules:
+        patterns = tuple(
+            (
+                field,
+                tuple(
+                    labels.resolve(p)
+                    if field == "label"
+                    and label_lookup.is_literal(p)
+                    and p not in label_lookup.SYSTEM_IDS
+                    else p
+                    for p in given
+                ),
+            )
+            for field, given in rule.patterns
+        )
+        resolved.append(replace(rule, patterns=patterns))
+    return tuple(resolved)
+
+
+def _values(message: Message, field: str, labels: label_lookup.Labels | None) -> tuple[str, ...]:
     """What a matcher is tried against; a field the message does not have gives nothing, so
-    `*` means "has one" (`list_id: ["*"]` is any mailing list), never "anything"."""
+    `*` means "has one" (`list_id: ["*"]` is any mailing list), never "anything". A label is
+    its id and, when the labels were read, its name."""
     if field == "label":
-        return tuple(label.lower() for label in message.labels)
+        found: list[str] = []
+        for label_id in message.labels:
+            found.append(label_id.lower())
+            name = labels.name_of(label_id) if labels is not None else None
+            if name is not None:
+                found.append(name.lower())
+        return tuple(found)
     one = {"from": message.sender, "subject": message.subject, "list_id": message.list_id}
     value = one[field][:MATCH_CHARS].lower()
     return (value,) if value.strip() else ()
 
 
-def matches(rule: Rule, message: Message) -> bool:
+def matches(rule: Rule, message: Message, labels: label_lookup.Labels | None = None) -> bool:
     return all(
-        any(fnmatch.fnmatchcase(value, p) for value in _values(message, field) for p in patterns)
+        any(
+            fnmatch.fnmatchcase(value, p.lower())
+            for value in _values(message, field, labels)
+            for p in patterns
+        )
         for field, patterns in rule.patterns
     )
 
 
-def decide(rules: Sequence[Rule], message: Message) -> Decision:
+def decide(
+    rules: Sequence[Rule], message: Message, labels: label_lookup.Labels | None = None
+) -> Decision:
     """The decision of `message`: the first matching rule's, else `interpret` without a rule."""
     for rule in rules:
-        if matches(rule, message):
+        if matches(rule, message, labels):
             return Decision(rule.action, rule)
     return Decision("interpret", None)
