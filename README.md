@@ -4,6 +4,12 @@
 
 Horae plugin: rules-first Gmail triage that turns requests into tasks.
 
+> **0.4.0** ([#6](../../issues/6)): a proposed `pack-mail-triage` (the pipeline and the skill,
+> in `docs/pack-mail-triage/`, for a repository the maintainer creates), a release workflow
+> for live evals (only on a `v*` tag, only with an `ANTHROPIC_API_KEY` secret, under a spend
+> cap), `horae-sdk` from PyPI (`>=0.9,<0.10`). **No new permission, scope or host**; nothing
+> changes for existing users.
+>
 > **0.3.0** ([#6](../../issues/6)): labels can be named (`label: [Receipts]`, `label_id:
 > Receipts`), resolved to ids with one `labels.list` call per run, and `account_index` makes
 > task links open the right Gmail account (`/mail/u/<n>/`). **No new permission**: same scopes,
@@ -288,13 +294,15 @@ guard refuses, and one where the model **invented** a message id, which the skil
   no cost. A stale recording fails.
 - The recorded answers (`evals/recorded/anthropic/*.json`, model `claude-fixture-1`) are
   **hand-written**. After a prompt, schema or view change, refresh their digests with
-  `uv run python scripts/sync_recordings.py`. **No live eval is run here**; re-recording
-  with a real model (`horae eval --live --record`) is for the maintainer, with a spend cap.
+  `uv run --with "$HORAE_CORE" python scripts/sync_recordings.py`. **No live eval is run on
+  a pull request**; the live eval is the release workflow below, and re-recording with a real
+  model (`horae eval --live --record`) is for the maintainer, with a spend cap.
 
 ### Pipeline
 
 [`examples/triage-mail.pipeline.yaml`](examples/triage-mail.pipeline.yaml) is an example to
-copy into your instance (the core does not install a plugin's pipelines yet): collect with
+copy into your instance (it keeps working; the same pipeline as an installable pack is
+proposed in [`docs/pack-mail-triage/`](docs/pack-mail-triage/)): collect with
 your rules, the `llm` step, and the tasks sink with `link_prefix:
 "https://mail.google.com/mail/u/0/"` (the prefix of `account_index: 0`; change both together). **No LLM call when rules decide:** the step's
 `skip_when_empty: ["[].data.needs_interpretation"]` makes no call, and costs nothing, when no
@@ -306,10 +314,26 @@ input, so the skip is covered by a pipeline-level test (`tests/test_skip.py`).
 
 - Core: a task link derived from the fingerprint, so that an LLM-made task (which cannot
   carry a link under `links: none`) links to its mail.
-- `pack-mail-triage`: the pipeline and skill as a pack, with IMAP mail through the same skill.
-- Left for later, see [#6](../../issues/6): moving the pipeline and skill to
-  `pack-mail-triage` (needs a new repository, which the maintainer creates), and a live eval
-  on a release tag (needs real accounts and a spend cap).
+- `pack-mail-triage` with IMAP mail through the same skill (the Gmail-only pack is proposed in
+  [`docs/pack-mail-triage/`](docs/pack-mail-triage/); the maintainer creates the repository,
+  then this plugin's `examples/` pipeline and `gmail/triage-mail` skill can be retired).
+- The wording review of the recorded answers is the maintainer's (#6).
+
+### Live evals on a release
+
+`.github/workflows/release-evals.yml` runs on a `v*` tag only (never on a pull request), in
+the `evals` environment, and **only when an `ANTHROPIC_API_KEY` secret exists**: without it the
+job prints a notice and succeeds. With it, `scripts/live-eval.sh` sends each golden case that
+is expected to pass the guard once to the real model (`horae eval --live`; not `injected-link`
+nor `invented-id`, whose recorded answer is a model that misbehaved), under one spend cap
+(`EVAL_MAX_USD`, default US$1.00, enforced by the core's `--max-usd`: a case whose worst case
+does not fit what is left is refused). Nothing is recorded. The merged report is attached to
+the release (a draft is made when the tag has none) as `live-eval-report-<tag>.json`.
+
+The maintainer must: create the environment `evals` with a required reviewer and deployment
+tags restricted to `v*`; add the secret `ANTHROPIC_API_KEY` to it (a key with its own spend
+limit is best); optionally edit `EVAL_MODEL`, `EVAL_PRICE_IN`, `EVAL_PRICE_OUT` and
+`EVAL_MAX_USD`; then judge the wording of the answers in the report.
 
 ## Which scope
 
@@ -448,12 +472,15 @@ errors, logs or the repository.
 uv sync
 uv lock --check
 uv run ruff check && uv run ruff format --check
-uv run mypy
-uv run pytest --cov                                        # coverage gate 85%
+# The core (`horae`) is not on PyPI, so it is not in uv.lock (the core's installer refuses a git
+# source in a plugin's lock). The tests that run the golden cases through it need it for one run:
+export HORAE_CORE="horae @ git+https://github.com/horae-dev/horae@c0fe01bf457ce99010e091f57ac8bc4ccb9b7f22"
+HORAE_REQUIRED=1 uv run --with "$HORAE_CORE" python -m pytest --cov    # coverage gate 85%
+uv run --with "$HORAE_CORE" python -m mypy                 # the same for the types
 HORAE_SDK_RECORD=1 uv run pytest                           # rewrite tests/recordings (review the diff)
 uv run python -m horae_gmail --manifest > plugin.yaml      # regenerate the manifest
-uv run horae eval gmail/triage-mail --plugin-dir .         # the golden cases, offline
-uv run python scripts/sync_recordings.py                   # refresh the hand-written answers' digests
+uv run --with "$HORAE_CORE" python -m horae eval gmail/triage-mail --plugin-dir .   # the golden cases, offline
+uv run --with "$HORAE_CORE" python scripts/sync_recordings.py   # refresh the hand-written answers' digests
 ```
 
 The tests use synthetic Gmail and OAuth responses recorded in `tests/fixtures/google` and a

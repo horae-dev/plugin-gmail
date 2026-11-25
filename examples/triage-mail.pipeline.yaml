@@ -1,8 +1,9 @@
-# examples/triage-mail.pipeline.yaml (plugin-gmail 0.3.0): Gmail triage into tasks.
+# examples/triage-mail.pipeline.yaml (plugin-gmail 0.4.0): Gmail triage into tasks.
 #
-# An example to copy into your instance's pipelines/ folder (the core does not install a
-# plugin's pipelines yet, and this one needs your rules and paths). Every parameter below is
-# trusted configuration. See the README, "Triage".
+# An example to copy into your instance's pipelines/ folder; it keeps working as it is. The
+# same pipeline, as a pack the core installs with `horae plugin add`, is proposed in
+# docs/pack-mail-triage/ (#6). It needs your rules and paths. Every parameter below is trusted
+# configuration. See the README, "Triage".
 #
 # 1. collect: `gmail.triage` reads the mail that arrived since the last run, applies YOUR rules
 #    (no model), proposes a task.create for the mail a rule made a task, and returns, as data,

@@ -1,13 +1,13 @@
 [project]
 name = "horae-plugin-gmail"
-version = "0.3.0"
+version = "0.4.0"
 description = "The Gmail Horae plugin: OAuth, read-only recent headers, and rules-first triage into tasks."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
-    "horae-sdk>=0.5,<0.6",
+    "horae-sdk>=0.9,<0.10",
     "httpx>=0.28.1,<1",
 ]
 
@@ -20,7 +20,6 @@ packages = ["src/horae_gmail"]
 
 [dependency-groups]
 dev = [
-    "horae",
     "mypy>=2.4",
     "pre-commit>=4.7",
     "pytest>=9.1",
@@ -29,19 +28,13 @@ dev = [
     "types-pyyaml>=6",
 ]
 
-# horae-sdk is not on PyPI yet: it comes from the core repository's main branch. uv.lock pins
-# the exact commit (CI checks the lock, so builds are reproducible); Renovate's weekly lock
-# file maintenance moves it to the latest main, or run `uv lock --upgrade-package horae-sdk`.
-# Once horae-sdk is published, delete this table: the requirement above then resolves from PyPI.
-[tool.uv.sources]
-horae-sdk = { git = "https://github.com/horae-dev/horae", branch = "main", subdirectory = "sdk" }
-# The core itself, for the tests only: the golden cases of the triage skill run through its
-# `horae eval` and the public replay backend (`horae.llm.replay`), offline.
-horae = { git = "https://github.com/horae-dev/horae", branch = "main" }
+# No uv source table: every package of uv.lock comes from PyPI with hashes, which is what the
+# core's installer requires (it refuses a git source anywhere in the lock, dev group included).
+# The core (`horae`) is not on PyPI: the golden-case tests need it, so CI and developers add it
+# for one run, outside the lock: `uv run --with "$HORAE_CORE" pytest` (see README, Development).
 
 [tool.uv]
 required-version = ">=0.13"
-exclude-newer = "7 days"
 
 [tool.ruff]
 line-length = 100

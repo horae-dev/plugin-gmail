@@ -3,7 +3,9 @@
 (`tests/fixtures/google/*.json`, never the network) and fake secrets."""
 
 import base64
+import importlib.util
 import json
+import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,17 @@ from horae_sdk import Plugin
 from horae_gmail import build
 
 HERE = Path(__file__).parent
+
+# The core (`horae`) is not in uv.lock (it is not on PyPI, and the core's installer refuses a git
+# source anywhere in a plugin's lock): the modules that run the golden cases and the example
+# pipeline through it need `uv run --with "$HORAE_CORE" pytest`. Without it they are not
+# collected, unless HORAE_REQUIRED=1 (CI), which makes a missing core an error.
+NEEDS_CORE = ("test_skill.py", "test_skip.py", "test_links.py", "test_pack.py")
+collect_ignore_glob = (
+    []
+    if os.environ.get("HORAE_REQUIRED") == "1" or importlib.util.find_spec("horae") is not None
+    else list(NEEDS_CORE)
+)
 GOOGLE = HERE / "fixtures" / "google"
 CLIENT_ID = "1234-fake.apps.example.org"
 CLIENT_SECRET = "GOCSPX-fake-client-secret"  # noqa: S105 (synthetic)

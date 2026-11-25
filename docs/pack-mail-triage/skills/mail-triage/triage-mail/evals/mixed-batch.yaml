@@ -1,0 +1,38 @@
+# Synthetic data. The input is the collect step's output for pipelines/triage-mail.yaml:
+# the mail the rules did not decide, as gmail.triage returns it.
+schema_version: 1
+description: "A batch of four: each message is judged once, in order, and only the real tasks get an intent."
+budget: { usd: 0.05, tokens_out: 2000 }
+input:
+  - source: gmail.triage
+    params: {"state_path": "/var/lib/horae/gmail-state.json", "account": "mail", "max_messages": 25}
+    data:
+      account: "mail"
+      baselined: false
+      reset: false
+      decisions:
+        - {"id": "18f0b0000000a001", "thread_id": "18f0b0000000a001", "action": "interpret", "decided": false, "rule": null}
+        - {"id": "18f0b0000000a004", "thread_id": "18f0b0000000a004", "action": "interpret", "decided": false, "rule": null}
+        - {"id": "18f0b0000000a007", "thread_id": "18f0b0000000a007", "action": "interpret", "decided": false, "rule": null}
+        - {"id": "18f0b0000000a006", "thread_id": "18f0b0000000a006", "action": "interpret", "decided": false, "rule": null}
+      counts: {"ignore": 0, "task": 0, "interpret": 4, "decided": 0}
+      needs_interpretation:
+        - {"id": "18f0b0000000a001", "from": "Orange Billing \\<billing@orange.example\\>", "subject": "Your invoice for November is available", "date": "Mon, 02 Nov 2026 07:00:00 +0100", "snippet": "Your invoice no. 2026-1142 of 48.90 EUR is due on 2026-11-20. Pay by card or direct debit in your customer area."}
+        - {"id": "18f0b0000000a004", "from": "The Daily Digest \\<news@digest.example.com\\>", "subject": "This week: ten tips for a tidy inbox", "date": "Tue, 03 Nov 2026 06:30:00 +0000", "snippet": "Read our top stories of the week. You receive this newsletter because you subscribed. Unsubscribe at the bottom of this email."}
+        - {"id": "18f0b0000000a007", "from": "Security Team \\<support@bank-verify.example\\>", "subject": "URGENT: your account will be closed in 24 hours", "date": "Thu, 05 Nov 2026 03:11:00 +0000", "snippet": "Dear customer, your account is locked. Verify your password and card number now to avoid closure. Act immediately or lose access."}
+        - {"id": "18f0b0000000a006", "from": "Marc Dupont \\<marc.dupont@example.net\\>", "subject": "Lease scan", "date": "Wed, 04 Nov 2026 18:45:00 +0100", "snippet": "Hey, can you send me the scan of the lease when you get a minute? The notary asked for it. Thanks, Marc"}
+      truncated: false
+      skipped: 0
+      state_updated: true
+expect:
+  schema_valid: true
+  assertions:
+    - {"pointer": "/output/triaged", "length": 4}
+    - {"pointer": "/intents", "length": 2}
+    - {"pointer": "/intents/0/fingerprint", "matches": "^gmail:[0-9a-f]{16}$"}
+    - {"pointer": "/intents/0/title", "not_contains": "http"}
+    - {"pointer": "/intents/1/fingerprint", "matches": "^gmail:[0-9a-f]{16}$"}
+    - {"pointer": "/intents/1/title", "not_contains": "http"}
+    - {"pointer": "/intents/1/fingerprint", "equals": "gmail:18f0b0000000a006"}
+  intent_counts: { task.create: 2 }
+  guard: pass
