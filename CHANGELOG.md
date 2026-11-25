@@ -3,6 +3,33 @@
 Every change to tools, parameters and permissions. A new permission is called out: users
 must approve it.
 
+## 0.4.0
+
+Triage follow-ups (#6, items 3 and 4, and the install fixes). **No new permission, scope,
+host, secret or intent**: `plugin.yaml` changes only its version, and `labels.list` (0.3.0)
+stays covered by `gmail.readonly` and `gmail.metadata`. **The plugin makes no LLM call.**
+Nothing changes for existing users: the example pipeline and the skill `gmail/triage-mail`
+stay as they are.
+
+- **`horae-sdk>=0.9,<0.10` from PyPI** (was `>=0.5,<0.6` from the core's git `main`): no
+  `[tool.uv.sources]`, so every package of `uv.lock` is a hashed PyPI wheel, as the core's
+  installer requires. `[tool.uv] exclude-newer` is removed (it breaks installs, horae#199).
+  `uv.lock` regenerated.
+- The core (`horae`, for the tests and `horae eval`) is no longer a dev dependency: it is not
+  on PyPI, and a git package anywhere in the lock is refused by the core's installer. CI and
+  developers add it for one run (`uv run --with "$HORAE_CORE" python -m pytest`, README,
+  Development). Without it the tests that need it are not collected, unless `HORAE_REQUIRED=1`
+  (CI) makes that an error.
+- **`pack-mail-triage` (proposal)**: `docs/pack-mail-triage/` holds the content of the pack
+  (manifest, pipeline `mail-triage`, skill `mail-triage/triage-mail` with its 13 golden cases)
+  for a repository the maintainer creates. Checked by `tests/test_pack.py`, which also fails
+  when it drifts from the example pipeline or the skill.
+- **Live evals on a release tag** (`.github/workflows/release-evals.yml`,
+  `scripts/live-eval.sh`): only on `v*`, only with an `ANTHROPIC_API_KEY` secret, under the
+  `EVAL_MAX_USD` cap; the report is attached to the release. Rules in `tests/test_workflows.py`.
+- Left for the maintainer (#6): create `pack-mail-triage`, the `evals` environment and its
+  secret, and judge the wording of the recorded answers.
+
 ## 0.3.0
 
 Triage follow-ups (#6, items 1 and 2). **No new permission, host, secret, intent or scope**

@@ -1,0 +1,15 @@
+# A pipeline pack (PLAN.md §3.1, §5): the triage-mail pipeline and the skill its llm step runs.
+# No runtime (schemas decision 18): the pack ships files only, so it needs no network, secret
+# or path. Its one intent is the task the skill proposes; the tasks sink applies it. The mail
+# is read by plugin-gmail (`gmail.triage`), which holds the network, secrets and state path.
+name: pack-mail-triage
+version: 0.1.0
+horae: ">=0,<0.2"
+description: The Gmail triage pipeline and its triage-mail skill.
+license: Apache-2.0
+homepage: https://github.com/horae-dev/pack-mail-triage
+provides:
+  skills: [mail-triage/triage-mail]
+  pipelines: [mail-triage]
+permissions:
+  intents: [task.create]

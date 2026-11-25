@@ -18,6 +18,11 @@ env:
   UV_PYTHON_PREFERENCE: only-managed
   # renovate: datasource=github-releases depName=astral-sh/uv
   UV_VERSION: 0.13.6
+  # The core (`horae`) is not on PyPI, so it is not in uv.lock (the core's installer refuses a
+  # git source in a plugin's lock): the golden-case tests and mypy add it for one run. Bump the
+  # commit by hand; HORAE_REQUIRED makes a missing core an error instead of skipped tests.
+  HORAE_CORE: "horae @ git+https://github.com/horae-dev/horae@c0fe01bf457ce99010e091f57ac8bc4ccb9b7f22"
+  HORAE_REQUIRED: "1"
 
 jobs:
   lock:
@@ -63,7 +68,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           cache-python: true
       - run: uv sync
-      - run: uv run mypy
+      - run: uv run --with "${HORAE_CORE}" python -m mypy
 
   test:
     name: Tests (pytest + coverage)
@@ -80,7 +85,7 @@ jobs:
       - run: uv sync
       # Replays tests/recordings (record mode is refused in CI); the 85% gate comes from
       # [tool.coverage.report] in pyproject.toml.
-      - run: uv run pytest --cov --cov-report=term-missing
+      - run: uv run --with "${HORAE_CORE}" python -m pytest --cov --cov-report=term-missing
 
   gitleaks:
     name: Secret scan (gitleaks)
